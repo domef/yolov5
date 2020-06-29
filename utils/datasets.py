@@ -325,6 +325,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
                 s = [x.split() for x in f.read().splitlines()]
                 assert len(s) == n, 'Shapefile out of sync'
         except:
+            # exif dovrebbe cambiare nulla, ritorna shape WxH
             s = [exif_size(Image.open(f)) for f in tqdm(self.img_files, desc='Reading image shapes')]
             np.savetxt(sp, s, fmt='%g')  # overwrites existing (if any)
 
@@ -334,7 +335,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         if self.rect:
             # Sort by aspect ratio
             s = self.shapes  # wh
-            ar = s[:, 1] / s[:, 0]  # aspect ratio
+            ar = s[:, 1] / s[:, 0]  # aspect ratio h/w
             irect = ar.argsort()
             self.img_files = [self.img_files[i] for i in irect]
             self.label_files = [self.label_files[i] for i in irect]
@@ -346,9 +347,10 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
             for i in range(nb):
                 ari = ar[bi == i]
                 mini, maxi = ari.min(), ari.max()
-                if maxi < 1:
+                # il lato più lungo è normalizzato a uno?
+                if maxi < 1: # più larga che alta
                     shapes[i] = [maxi, 1]
-                elif mini > 1:
+                elif mini > 1: # più alta che larga
                     shapes[i] = [1, 1 / mini]
 
             self.batch_shapes = np.ceil(np.array(shapes) * img_size / stride + pad).astype(np.int) * stride
