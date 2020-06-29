@@ -294,6 +294,9 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         except:
             raise Exception('Error loading data from %s. See %s' % (path, help_url))
 
+        # f is empty in training
+        # self.img_files: list of filepaths
+
         n = len(self.img_files)
         assert n > 0, 'No images found in %s. See %s' % (path, help_url)
         bi = np.floor(np.arange(n) / batch_size).astype(np.int)  # batch index
@@ -390,7 +393,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
                 nf += 1  # file found
 
                 # Create subdataset (a smaller dataset)
-                if create_datasubset and ns < 1E4:
+                if create_datasubset and ns < 1E4: # always false
                     if ns == 0:
                         create_folder(path='./datasubset')
                         os.makedirs('./datasubset/images')
@@ -402,7 +405,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
                             f.write(self.img_files[i] + '\n')
 
                 # Extract object detection boxes for a second stage classifier
-                if extract_bounding_boxes:
+                if extract_bounding_boxes: # always false
                     p = Path(self.img_files[i])
                     img = cv2.imread(str(p))
                     h, w = img.shape[:2]
@@ -539,11 +542,25 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
 
         return torch.from_numpy(img), labels_out, self.img_files[index], shapes
 
+        # imgs tensor B x C x H x W
+        # labels tensor B x 6, each tensor: 0 (img id in the batch will be assigned in collate_fn),
+                                          # class,
+                                          # x_c,
+                                          # y_c,
+                                          # w,
+                                          # h
+        # tuple with path of each image in batch
+        # ?
+
+    # this is called after __getitem__ (after an entire batch)
     @staticmethod
     def collate_fn(batch):
         img, label, path, shapes = zip(*batch)  # transposed
         for i, l in enumerate(label):
             l[:, 0] = i  # add target image index for build_targets()
+
+        # img is a tuple -> return a single 4d tensor
+        # label is a tuple -> return a single list of labels
         return torch.stack(img, 0), torch.cat(label, 0), path, shapes
 
 
