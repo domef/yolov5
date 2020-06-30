@@ -83,6 +83,9 @@ def train(hyp):
 
     # Image sizes
     gs = int(max(model.stride))  # grid size (max stride)
+    print('gs', gs)
+    print('stride', model.stride)
+    print('----------------------------------------------------------')
     imgsz, imgsz_test = [check_img_size(x, gs) for x in opt.img_size]  # verify imgsz are gs-multiples
 
     # Optimizer
@@ -156,6 +159,7 @@ def train(hyp):
         # pip install torch==1.4.0+cu100 torchvision==0.5.0+cu100 -f https://download.pytorch.org/whl/torch_stable.html
 
     # Trainloader
+    # gs is stride
     dataloader, dataset = create_dataloader(train_path, imgsz, batch_size, gs, opt,
                                             hyp=hyp, augment=True, cache=opt.cache_images, rect=opt.rect)
     mlc = np.concatenate(dataset.labels, 0)[:, 0].max()  # max label class
@@ -214,7 +218,10 @@ def train(hyp):
         mloss = torch.zeros(4, device=device)  # mean losses
         print(('\n' + '%10s' * 8) % ('Epoch', 'gpu_mem', 'GIoU', 'obj', 'cls', 'total', 'targets', 'img_size'))
         pbar = tqdm(enumerate(dataloader), total=nb)  # progress bar
-        for i, (imgs, targets, paths, _) in pbar:  # batch -------------------------------------------------------------
+        for i, (imgs, targets, paths, x) in pbar:  # batch -------------------------------------------------------------
+            # print('labels:', targets.size())
+            print('labels:', targets)
+
             ni = i + nb * epoch  # number integrated batches (since train start)
             imgs = imgs.to(device).float() / 255.0  # uint8 to float32, 0 - 255 to 0.0 - 1.0
 

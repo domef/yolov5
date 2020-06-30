@@ -6,9 +6,7 @@ from albumentations import BboxParams, Normalize, Resize, PadIfNeeded, Compose
 import math
 
 class BlenderDataset(Dataset):
-    # def __init__(self, path, img_size=640, batch_size=16, augment=False, hyp=None, rect=False, image_weights=False,
-    #              cache_images=False, single_cls=False, stride=32, pad=0.0):
-    
+
     def __init__(self, opt, split, transforms):
         super(BlenderDataset, self).__init__()
 
@@ -23,6 +21,7 @@ class BlenderDataset(Dataset):
             imgs = [os.path.join(self._opt['path'], self._split, dirname, x) for x in os.listdir(os.path.join(self._opt['path'], self._split, dirname)) if 'background' in x]
             self._images_path += imgs
             self._keypoints_path += [os.path.join(self._opt['path'], self._split, dirname, '{}_keypoints.txt'.format(dirname))] * len(imgs)
+    
     def __len__(self):
         return len(self._images_path)
 
@@ -35,7 +34,7 @@ class BlenderDataset(Dataset):
         keypoints = []
         with open(self._keypoints_path[idx], 'r') as f:
             c, x, y = f.readlines().strip().split('\n')
-            keypoints.append([c, x, y])
+            keypoints.append([self._opt['classes mapping'][c], x, y])
 
         # coco format -> yolo format
         bbox_size = 32 # parametro configurabile
@@ -47,9 +46,23 @@ class BlenderDataset(Dataset):
                               bbox[3] / h]
                               for bbox in bboxes]
             
+        old_h = img.shape[0]
+        old_w = img.shape[1]
+        new_h = img.shape[0]
+        new_w = img.shape[1]
+        if not img.shape[1] % 32 == 0:
+            new_w = old_w + (32 - old_w % 32)
+            ratio = new_w / old_w
+            new_h = int(old_h * ratio)
+            self._transforms.append(Resize(new_h, new_w))
+
+        if not img.shape[0] % 32 == 0:
+            new_h = new_h + (32 - new_h % 32)
+            self._transforms.append(PadIfNeeded(new_h, new_w))
+
         self._transforms.append(Normalize(p=1.0))
         
-        aug = Compose(self._transforms, bbox_params=BboxParams(format='yolo', min_area=0, min_visibility=0, label_fields=['category_id']))
+        aug = Compose(self._transforms, bbox_params=BboxParams(format='yolo', label_fields=['category_id']))
         res = aug(image=img, bboxes=normalized_bboxes, category_id=keypoints[:,0])
 
         img = res['image']
@@ -59,7 +72,6 @@ class BlenderDataset(Dataset):
         img = img.transpose(2,0,1)
 
         labels = [[0,
-                   #self._opt['classes mapping'][i],
                    classes_id[i],
                    bbox[0],
                    bbox[1],
