@@ -6,6 +6,8 @@ from albumentations import BboxParams, Normalize, Resize, PadIfNeeded, Compose
 import math
 
 class BlenderDataset(Dataset):
+    # def __init__(self, path, img_size=640, batch_size=16, augment=False, hyp=None, rect=False, image_weights=False,
+    #              cache_images=False, single_cls=False, stride=32, pad=0.0):
     
     def __init__(self, opt, split, transforms):
         super(BlenderDataset, self).__init__()
@@ -14,16 +16,13 @@ class BlenderDataset(Dataset):
         self._split = split
         self._transforms = transforms
         self._images_path = []
-        self._bbox_path = []
-        self._class_path = []
+        self._keypoints_path = []
         dirlist = os.listdir(os.path.join(self._opt['path'], self._split))
 
         for dirname in dirlist:
             imgs = [os.path.join(self._opt['path'], self._split, dirname, x) for x in os.listdir(os.path.join(self._opt['path'], self._split, dirname)) if 'background' in x]
             self._images_path += imgs
-            self._bbox_path += [os.path.join(self._opt['path'], self._split, dirname, '{}_objectbb.txt'.format(dirname))] * len(imgs)
-            self._class_path +=[os.path.join(self._opt['path'], self._split, dirname, '{}_objects.txt'.format(dirname))] * len(imgs)
-
+            self._keypoints_path += [os.path.join(self._opt['path'], self._split, dirname, '{}_keypoints.txt'.format(dirname))] * len(imgs)
     def __len__(self):
         return len(self._images_path)
 
@@ -31,24 +30,15 @@ class BlenderDataset(Dataset):
         img = Image.open(self._images_path[idx])
         img = np.array(img)
 
-        # # read bboxes gt
-        # bboxes = []
-        # with open(self._bbox_path[idx], 'r') as f:
-        #     x, y, w, h = map(int, f.readline().strip().split(' '))
-        #     bboxes.append([x, y, w, h])
-
-        # # read classes gt
-        # classes_id = []
-        # with open(self._class_path[idx], 'r') as f:
-        #     class_id = self._opt['classes mapping'][(f.readline().strip())]
-        #     classes_id.append(class_id)
-
         # read keypoints
         # type - x - y
         keypoints = []
+        with open(self._keypoints_path[idx], 'r') as f:
+            c, x, y = f.readlines().strip().split('\n')
+            keypoints.append([c, x, y])
 
         # coco format -> yolo format
-        bbox_size = 32 # parametro esterno---------------------------------------------
+        bbox_size = 32 # parametro configurabile
         h, w = img.shape[:2]
         bboxes = [[kp[1], kp[2], bbox_size, bbox_size] for kp in keypoints]
         normalized_bboxes = [[bbox[0] / w,
@@ -88,34 +78,3 @@ class BlenderDataset(Dataset):
         # img is a tuple -> return a single 4d tensor
         # label is a tuple -> return a single list of labels
         return torch.stack(img, 0), torch.cat(label, 0), path, shapes
-
-
-class BlenderDataBunch(object):
-
-    def __init__(self, opt, transforms):
-        self.train_dataset = BlenderDataset(opt, 'train', transforms)
-        self.val_dataset = BlenderDataset(opt, 'val', transforms)
-        self.test_dataset = BlenderDataset(opt, 'test', transforms)
-
-        self.dataloaders = {
-            'train': DataLoader(self.train_dataset, shuffle=True, batch_size=opt['batch size'], num_workers=opt['num workers']),
-            'val': DataLoader(self.val_dataset, shuffle=False, batch_size=opt['batch size'], num_workers=opt['num workers']),
-            'test': DataLoader(self.test_dataset, shuffle=False, batch_size=opt['batch size'], num_workers=opt['num workers']),
-        }
-
-# class DataBunch(object):
-
-#     def __init__(self, opt, dataset, transforms, val=True, test=True):
-#         self.dataloaders = dict()
-
-#         self.train_dataset = dataset(opt, 'train', transforms)
-#         self.dataloaders['train'] = DataLoader(self.train_dataset, shuffle=True, batch_size=opt['batch size'], num_workers=opt['num workers'])
-        
-#         if val:
-#             self.val_dataset = dataset(opt, 'val', [])
-#             self.dataloaders['val'] = DataLoader(self.val_dataset, shuffle=False, batch_size=opt['batch size'], num_workers=opt['num workers'])
-        
-#         if test:
-#             self.test_dataset = dataset(opt, 'test', [])
-#             self.dataloaders['test'] = DataLoader(self.test_dataset, shuffle=False, batch_size=opt['batch size'], num_workers=opt['num workers'])
-            
