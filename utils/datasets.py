@@ -332,8 +332,9 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         self.shapes = np.array(s, dtype=np.float64)
 
         # Rectangular Training  https://github.com/ultralytics/yolov3/issues/232
+        # each batch is resized to the same rectangle?
         if self.rect:
-            # Sort by aspect ratio
+            # Sort by aspect ratio (little to big)
             s = self.shapes  # wh
             ar = s[:, 1] / s[:, 0]  # aspect ratio h/w
             irect = ar.argsort()
@@ -347,12 +348,12 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
             for i in range(nb):
                 ari = ar[bi == i]
                 mini, maxi = ari.min(), ari.max()
-                # il lato più lungo è normalizzato a uno?
                 if maxi < 1: # più larga che alta
                     shapes[i] = [maxi, 1]
                 elif mini > 1: # più alta che larga
                     shapes[i] = [1, 1 / mini]
 
+            # even if pad is 0, it makes size multiple of stride
             self.batch_shapes = np.ceil(np.array(shapes) * img_size / stride + pad).astype(np.int) * stride
 
         # Cache labels
